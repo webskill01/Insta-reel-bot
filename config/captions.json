@@ -1,0 +1,57 @@
+{
+  "defaults": {
+    "share_to_feed": true,
+    "hashtagCount": 15,
+    "appendHashtags": ["#reels", "#viral", "#trending"],
+    "captionTemplate": "{title}\n\n{hashtags}"
+  },
+  "niches": {
+    "motivation": {
+      "captionTemplate": "{title}\n\n💪 Double tap if you agree!\n\n{hashtags}",
+      "hashtags": [
+        "#motivation", "#mindset", "#success", "#grindset", "#inspire",
+        "#hustle", "#goals", "#motivational", "#nevergiveup", "#dailymotivation",
+        "#selfimprovement", "#discipline", "#focusonyourself", "#winnersmindset", "#ambition"
+      ]
+    },
+    "finance": {
+      "captionTemplate": "{title}\n\n💰 Save this for later!\n\n{hashtags}",
+      "hashtags": [
+        "#finance", "#investing", "#money", "#wealth", "#financialtips",
+        "#stocks", "#crypto", "#passiveincome", "#financialfreedom", "#moneymanagement",
+        "#personalfinance", "#moneytips", "#wealthbuilding", "#financialliteracy", "#investor"
+      ]
+    },
+    "tech": {
+      "captionTemplate": "{title}\n\n🔥 Follow for more tech!\n\n{hashtags}",
+      "hashtags": [
+        "#tech", "#technology", "#innovation", "#coding", "#ai",
+        "#programming", "#software", "#gadgets", "#techreview", "#futuretech",
+        "#techtips", "#techworld", "#artificialintelligence", "#machinelearning", "#startup"
+      ]
+    },
+    "fitness": {
+      "captionTemplate": "{title}\n\n💪 Tag your gym buddy!\n\n{hashtags}",
+      "hashtags": [
+        "#fitness", "#workout", "#gym", "#health", "#fit",
+        "#bodybuilding", "#motivation", "#fitnessmotivation", "#training", "#exercise",
+        "#healthylifestyle", "#muscle", "#gymlife", "#fitfam", "#gains"
+      ]
+    },
+    "cooking": {
+      "captionTemplate": "{title}\n\n🍳 Save this recipe!\n\n{hashtags}",
+      "hashtags": [
+        "#cooking", "#recipe", "#food", "#foodie", "#chef",
+        "#homecooking", "#delicious", "#yummy", "#easyrecipe", "#foodlover",
+        "#instafood", "#kitchen", "#healthyfood", "#foodporn", "#recipes"
+      ]
+    },
+    "clips": {
+      "captionTemplate": "{title}\n\n{hashtags}",
+      "hashtags": [
+        "#clips", "#viral", "#trending", "#fyp", "#explore",
+        "#foryou", "#foryoupage", "#viralvideos", "#entertainment", "#funnyvideos"
+      ]
+    }
+  }
+}

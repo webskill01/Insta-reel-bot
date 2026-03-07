@@ -1,0 +1,23 @@
+{
+  "accounts": [
+    {
+      "niche": "clips",
+      "channels": [
+        { "id": "UCxxxxxxxxxxxxxxxxxxxxxx", "name": "Example Clips Channel 1" },
+        { "id": "UCyyyyyyyyyyyyyyyyyyyyyy", "name": "Example Clips Channel 2" }
+      ]
+    },
+    {
+      "niche": "motivation",
+      "channels": [
+        { "id": "UCaaaaaaaaaaaaaaaaaaaaa", "name": "Example Motivation Channel" }
+      ]
+    },
+    {
+      "niche": "finance",
+      "channels": [
+        { "id": "UCbbbbbbbbbbbbbbbbbbbbb", "name": "Example Finance Channel" }
+      ]
+    }
+  ]
+}
