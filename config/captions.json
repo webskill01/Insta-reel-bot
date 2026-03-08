@@ -47,7 +47,7 @@
       ]
     },
     "clips": {
-      "captionTemplate": "{title}\n\n{hashtags}",
+      "captionTemplate": "{title}\n\n Follow for more Content \n\n{hashtags}",
       "hashtags": [
         "#clips", "#viral", "#trending", "#fyp", "#explore",
         "#foryou", "#foryoupage", "#viralvideos", "#entertainment", "#funnyvideos"

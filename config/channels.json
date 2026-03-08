@@ -3,20 +3,9 @@
     {
       "niche": "clips",
       "channels": [
-        { "id": "UCxxxxxxxxxxxxxxxxxxxxxx", "name": "Example Clips Channel 1" },
-        { "id": "UCyyyyyyyyyyyyyyyyyyyyyy", "name": "Example Clips Channel 2" }
-      ]
-    },
-    {
-      "niche": "motivation",
-      "channels": [
-        { "id": "UCaaaaaaaaaaaaaaaaaaaaa", "name": "Example Motivation Channel" }
-      ]
-    },
-    {
-      "niche": "finance",
-      "channels": [
-        { "id": "UCbbbbbbbbbbbbbbbbbbbbb", "name": "Example Finance Channel" }
+        { "id": "UCqEfLGxwY2v4X44aDMmMocw", "name": "DualFeed Media" },
+        { "id": "UCJQ46lK8_xj1DDXkNIs0sbg", "name": "DailyDiscover" },
+        { "id": "UCN_Isrggs_Qhdl4PF_M-y2g", "name": "Notable Net" }
       ]
     }
   ]
