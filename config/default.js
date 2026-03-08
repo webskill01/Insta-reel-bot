@@ -45,7 +45,7 @@ module.exports = {
   // Instagram API
   instagram: {
     graphApiVersion: 'v21.0',
-    graphApiBase: 'https://graph.instagram.com',
+    graphApiBase: 'https://graph.facebook.com',
     containerPollIntervalMs: 30_000,  // 30 seconds
     containerPollMaxAttempts: 20,     // 10 minutes total
     rateLimitPerHour: 180,            // 200 limit with 20 buffer
