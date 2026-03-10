@@ -141,6 +141,70 @@ class DiscoveryService {
     `).get(niche, accountId) || null;
   }
 
+  /**
+   * Deep-scans all active channels, paginating back through upload history
+   * to find older Shorts not yet in the DB. Called when regular scan + fresh
+   * discovery both yield no content for an account.
+   */
+  async deepScanAllChannels() {
+    logger.info('Running deep channel scan for older content...');
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - config.youtube.maxContentAgeDays);
+
+    let totalNew = 0;
+    const channels = this.db.prepare('SELECT * FROM channels WHERE is_active = 1').all();
+
+    for (const channel of channels) {
+      try {
+        let playlistId = channel.uploads_playlist;
+        if (!playlistId) {
+          playlistId = await this.yt.getUploadsPlaylistId(channel.channel_id);
+          this.db.prepare('UPDATE channels SET uploads_playlist = ? WHERE id = ?')
+            .run(playlistId, channel.id);
+        }
+
+        // Fetch without ETag so we paginate deeper (ignores cache)
+        const result = await this.yt.getPlaylistItems(
+          playlistId, null, 50, config.youtube.deepScanPages
+        );
+
+        // Filter to content within the age limit
+        const recentItems = result.items.filter(i => new Date(i.publishedAt) >= cutoff);
+        if (recentItems.length === 0) continue;
+
+        const videoIds = recentItems.map(i => i.videoId);
+        const details = await this.yt.getVideoDetails(videoIds);
+        const shorts = details.filter(
+          v => v.durationSec > 0 && v.durationSec <= config.youtube.shortsMaxDurationSec
+        );
+
+        const insertStmt = this.db.prepare(`
+          INSERT OR IGNORE INTO videos (youtube_id, channel_id, title, duration_sec, niche, status)
+          VALUES (?, ?, ?, ?, ?, 'discovered')
+        `);
+
+        let inserted = 0;
+        const insertMany = this.db.transaction((videos) => {
+          for (const v of videos) {
+            const r = insertStmt.run(v.id, channel.channel_id, v.title, v.durationSec, channel.niche);
+            if (r.changes > 0) inserted++;
+          }
+        });
+        insertMany(shorts);
+
+        if (inserted > 0) {
+          logger.info(`Deep scan — Channel ${channel.channel_name}: found ${inserted} older Shorts`);
+          totalNew += inserted;
+        }
+      } catch (err) {
+        logger.error(`Deep scan: failed for channel ${channel.channel_name}`, { error: err.message });
+      }
+    }
+
+    logger.info(`Deep scan complete: ${totalNew} new older Shorts added`);
+    return totalNew;
+  }
+
   _getCachedEtag(key) {
     const row = this.db.prepare(
       'SELECT etag FROM etag_cache WHERE cache_key = ?'

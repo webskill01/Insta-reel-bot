@@ -42,7 +42,13 @@ class PipelineCoordinator {
       }
 
       if (!video) {
-        logger.warn(`No videos available for ${account.ig_username} after discovery scan`);
+        logger.info(`No fresh content for ${account.ig_username} — running deep channel scan...`);
+        await this.discovery.deepScanAllChannels();
+        video = this.discovery.pickVideoForAccount(account.niche, account.id);
+      }
+
+      if (!video) {
+        logger.warn(`No videos available for ${account.ig_username} even after deep scan`);
         return { success: false, error: 'no_videos_available' };
       }
 

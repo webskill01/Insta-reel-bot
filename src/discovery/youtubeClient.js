@@ -75,29 +75,48 @@ class YouTubeClient {
   }
 
   /**
-   * Lists recent items from a playlist with ETag caching.
-   * Costs 1 unit (0 on 304 Not Modified).
+   * Lists items from a playlist with ETag caching and optional pagination.
+   * ETag is only sent on the first page request (preserves 304 short-circuit).
+   * Costs 1 unit per page (0 on 304 Not Modified for page 0).
+   * @param {string} playlistId
+   * @param {string|null} etag - cached ETag for 304 checking
+   * @param {number} maxResults - items per page (max 50)
+   * @param {number} maxPages - max pages to fetch (1 = no pagination)
    */
-  async getPlaylistItems(playlistId, etag = null, maxResults = 10) {
-    const res = await this._request('playlistItems', {
-      part: 'snippet,contentDetails',
-      playlistId,
-      maxResults: String(maxResults),
-    }, etag);
+  async getPlaylistItems(playlistId, etag = null, maxResults = 10, maxPages = 1) {
+    const allItems = [];
+    let pageToken = null;
+    let finalEtag = etag;
 
-    if (res.notModified) {
-      logger.debug(`Playlist ${playlistId}: not modified (ETag hit)`);
-      return { items: [], etag, notModified: true };
+    for (let page = 0; page < maxPages; page++) {
+      const params = {
+        part: 'snippet,contentDetails',
+        playlistId,
+        maxResults: String(maxResults),
+      };
+      if (pageToken) params.pageToken = pageToken;
+
+      const res = await this._request('playlistItems', params, page === 0 ? etag : null);
+
+      if (res.notModified) {
+        logger.debug(`Playlist ${playlistId}: not modified (ETag hit)`);
+        return { items: [], etag, notModified: true };
+      }
+
+      if (page === 0) finalEtag = res.etag;
+
+      allItems.push(...(res.items || []).map(item => ({
+        videoId: item.contentDetails.videoId,
+        title: item.snippet.title,
+        publishedAt: item.snippet.publishedAt,
+        channelId: item.snippet.channelId,
+      })));
+
+      if (!res.nextPageToken) break;
+      pageToken = res.nextPageToken;
     }
 
-    const items = (res.items || []).map(item => ({
-      videoId: item.contentDetails.videoId,
-      title: item.snippet.title,
-      publishedAt: item.snippet.publishedAt,
-      channelId: item.snippet.channelId,
-    }));
-
-    return { items, etag: res.etag, notModified: false };
+    return { items: allItems, etag: finalEtag, notModified: false };
   }
 
   /**

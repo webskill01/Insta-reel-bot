@@ -55,6 +55,8 @@ module.exports = {
   youtube: {
     maxResultsPerChannel: 10,
     shortsMaxDurationSec: 60,
+    deepScanPages: 1,        // Pages to fetch per channel when doing on-demand deep scan (3×50=150 videos)
+    maxContentAgeDays: 30,  // Reject Shorts older than this many days (~5 months)
   },
 
   // Download

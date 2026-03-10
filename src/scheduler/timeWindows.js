@@ -45,10 +45,13 @@ function generateDailyTimes(postsPerDay) {
     selectedKeys = shuffled.slice(0, postsPerDay);
   }
 
-  const times = selectedKeys.map(key => randomTimeInWindow(windows[key]));
-  times.sort((a, b) => a.getTime() - b.getTime());
+  const now = new Date();
+  const futureTimes = selectedKeys
+    .map(key => randomTimeInWindow(windows[key]))
+    .filter(t => t > now);
+  futureTimes.sort((a, b) => a.getTime() - b.getTime());
 
-  return times;
+  return futureTimes;
 }
 
 module.exports = { generateDailyTimes, randomTimeInWindow };
