@@ -1,5 +1,6 @@
 const { execSync } = require('child_process');
 const http = require('http');
+const https = require('https');
 const logger = require('../utils/logger');
 const config = require('../../config/default');
 
@@ -136,7 +137,8 @@ class HealthMonitor {
     const url = `${config.nginxBaseUrl}/health`;
 
     return new Promise((resolve) => {
-      const req = http.get(url, { timeout: 5000 }, (res) => {
+      const client = url.startsWith('https://') ? https : http;
+      const req = client.get(url, { timeout: 5000 }, (res) => {
         if (res.statusCode === 200) {
           resolve({ status: 'ok' });
         } else {

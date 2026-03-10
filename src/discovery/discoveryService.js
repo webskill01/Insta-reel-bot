@@ -133,7 +133,8 @@ class DiscoveryService {
         AND v.status = 'discovered'
         AND v.locked_by IS NULL
         AND v.id NOT IN (
-          SELECT video_id FROM posts WHERE account_id = ?
+          SELECT video_id FROM posts
+          WHERE account_id = ? AND status != 'failed'
         )
       ORDER BY RANDOM()
       LIMIT 1
