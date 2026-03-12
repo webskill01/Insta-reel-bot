@@ -14,6 +14,7 @@ class Scheduler {
 
     // Map<accountId, { times: Date[], executed: Set<index> }>
     this.dailySchedule = new Map();
+    this._lastPlanDate = null;
     this._jobs = [];
     this._running = false;
   }
@@ -73,6 +74,16 @@ class Scheduler {
    * Plans posting times for all active accounts for today.
    */
   planDay() {
+    this._lastPlanDate = new Date().toISOString().split('T')[0];
+
+    // Reset videos that failed due to transient errors so they can be retried today
+    const reset = this.db.prepare(
+      "UPDATE videos SET status='discovered', retry_count=0, error_message=NULL, locked_by=NULL WHERE status='failed'"
+    ).run();
+    if (reset.changes > 0) {
+      logger.info(`Reset ${reset.changes} failed video(s) to discovered for retry`);
+    }
+
     const accounts = this.db.prepare(
       'SELECT * FROM accounts WHERE is_active = 1'
     ).all();
@@ -100,6 +111,13 @@ class Scheduler {
    * Checks the schedule map, fires pipeline for posts whose time has arrived.
    */
   async executePendingPosts() {
+    // Self-healing: replan if midnight cron was missed (node-cron reliability issue)
+    const today = new Date().toISOString().split('T')[0];
+    if (this._lastPlanDate !== today) {
+      logger.info(`New day detected in execution tick, replanning for ${today}...`);
+      this.planDay();
+    }
+
     const now = Date.now();
 
     for (const [accountId, schedule] of this.dailySchedule.entries()) {

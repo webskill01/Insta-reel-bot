@@ -27,7 +27,7 @@ module.exports = {
 
   // Cron schedules
   cron: {
-    dailyPlanner:    '0 0 * * *',    // Midnight: plan today's posts
+    dailyPlanner:    '1 0 * * *',    // 00:01: plan today's posts (avoids midnight collision)
     executionTick:   '*/2 * * * *',  // Every 2 min: check for due posts
     discoveryScan:   '0 */4 * * *',  // Every 4 hours: scan YouTube
     tokenRefresh:    '0 3 * * *',    // 3 AM: check token expiry
@@ -55,8 +55,8 @@ module.exports = {
   youtube: {
     maxResultsPerChannel: 10,
     shortsMaxDurationSec: 60,
-    deepScanPages: 1,        // Pages to fetch per channel when doing on-demand deep scan (3×50=150 videos)
-    maxContentAgeDays: 30,  // Reject Shorts older than this many days (~5 months)
+    deepScanPages: 5,        // Pages to fetch per channel (5×50=250 videos ≈ 5 months of content)
+    maxContentAgeDays: 150, // Reject Shorts older than 5 months
   },
 
   // Download
