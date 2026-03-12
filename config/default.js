@@ -20,9 +20,9 @@ module.exports = {
 
   // Scheduling - time windows for randomized posting (HH:MM in server timezone)
   postingWindows: {
-    morning:   { start: '07:00', end: '09:30' },
-    afternoon: { start: '12:00', end: '14:30' },
-    evening:   { start: '18:00', end: '21:00' },
+    morning:   { start: '08:00', end: '09:00' },
+    afternoon: { start: '14:00', end: '15:00' },
+    evening:   { start: '20:00', end: '22:00' },
   },
 
   // Cron schedules
