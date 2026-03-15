@@ -23,8 +23,10 @@ class PublishService {
    * Full publish flow for one video to one account.
    * Creates container → polls → publishes → verifies.
    */
-  async publishReel(video, account) {
-    const { caption, metadata } = this.generateCaption(video, account);
+  async publishReel(video, account, prebuiltCaption = null) {
+    const { caption, metadata } = prebuiltCaption
+      ? { caption: prebuiltCaption, metadata: this._buildMetadata(video, account) }
+      : this.generateCaption(video, account);
     const videoUrl = `${config.nginxBaseUrl}/processed/${video.youtube_id}.mp4`;
 
     // Create or get post record
@@ -162,6 +164,19 @@ class PublishService {
     if (nicheConfig.collaborators) metadata.collaborators = nicheConfig.collaborators;
 
     return { caption, metadata };
+  }
+
+  _buildMetadata(video, account) {
+    const cfg = loadCaptionConfig();
+    const defaults = cfg.defaults || {};
+    const nicheConfig = cfg.niches?.[account.niche] || {};
+    const metadata = {};
+    const shareToFeed = nicheConfig.share_to_feed ?? defaults.share_to_feed;
+    if (shareToFeed !== undefined) metadata.share_to_feed = shareToFeed;
+    if (nicheConfig.cover_url) metadata.cover_url = nicheConfig.cover_url;
+    if (nicheConfig.location_id) metadata.location_id = nicheConfig.location_id;
+    if (nicheConfig.collaborators) metadata.collaborators = nicheConfig.collaborators;
+    return metadata;
   }
 
   _updatePostStatus(postId, status, extra = {}) {

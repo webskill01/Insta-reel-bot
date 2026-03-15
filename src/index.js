@@ -10,6 +10,8 @@ const { TransformService } = require('./transformer/transformService');
 const { IGClient } = require('./publisher/igClient');
 const { PublishService } = require('./publisher/publishService');
 const { PipelineCoordinator } = require('./pipeline/coordinator');
+const { generateCaptions } = require('./services/captionService');
+const { FacebookClient } = require('./publisher/facebookClient');
 const { Scheduler } = require('./scheduler/scheduler');
 const { CleanupService } = require('./cleanup/cleanupService');
 const { TokenManager } = require('./tokens/tokenManager');
@@ -47,18 +49,23 @@ async function main() {
   const tokenManager = new TokenManager(db, igClient);
   const healthMonitor = new HealthMonitor(db, cleanupService);
 
-  // 3. Initialize pipeline coordinator
+  // 3. Initialize caption service and Facebook client
+  const captionService = { generateCaptions };
+  const facebookClient = new FacebookClient();
+
+  // 4. Initialize pipeline coordinator
   coordinator = new PipelineCoordinator(
-    db, discoveryService, downloadService, transformService, publishService, cleanupService
+    db, discoveryService, downloadService, transformService, publishService, cleanupService,
+    captionService, facebookClient
   );
 
-  // 4. Seed accounts from env vars (if not already in DB)
+  // 5. Seed accounts from env vars (if not already in DB)
   seedAccountsFromEnv(db);
 
-  // 4b. Sync YouTube channels from config/channels.json
+  // 5b. Sync YouTube channels from config/channels.json
   seedChannelsFromConfig(db);
 
-  // 5. Start scheduler
+  // 6. Start scheduler
   scheduler = new Scheduler(
     db, coordinator, discoveryService, tokenManager, cleanupService, healthMonitor
   );

@@ -2,13 +2,15 @@ const logger = require('../utils/logger');
 const config = require('../../config/default');
 
 class PipelineCoordinator {
-  constructor(db, discoveryService, downloadService, transformService, publishService, cleanupService) {
+  constructor(db, discoveryService, downloadService, transformService, publishService, cleanupService, captionService = null, facebookClient = null) {
     this.db = db;
     this.discovery = discoveryService;
     this.downloader = downloadService;
     this.transformer = transformService;
     this.publisher = publishService;
     this.cleanup = cleanupService;
+    this.captionService = captionService;
+    this.fbClient = facebookClient;
     this._inFlight = new Set();
   }
 
@@ -70,14 +72,35 @@ class PipelineCoordinator {
       const processedPath = await this.transformer.transform(rawPath, video.youtube_id);
       this._updateVideoStatus(video.id, 'transformed', { processed_path: processedPath });
 
-      // Step 4: Publish
+      // Step 4: Generate captions
+      let igCaption = null;
+      let fbCaption = null;
+      if (this.captionService) {
+        try {
+          const captions = await this.captionService.generateCaptions(video, account);
+          igCaption = captions.instagram;
+          fbCaption = captions.facebook;
+        } catch (err) {
+          logger.warn(`Caption generation failed, using template fallback: ${err.message}`);
+        }
+      }
+
+      // Step 5: Publish to Instagram
       this._updateVideoStatus(video.id, 'publishing');
-      const result = await this.publisher.publishReel(video, account);
+      const result = await this.publisher.publishReel(video, account, igCaption);
 
       if (result.success) {
         this._updateVideoStatus(video.id, 'published');
 
-        // Step 5: Cleanup files
+        // Step 5b: Cross-post to Facebook (non-blocking, before file cleanup)
+        if (this.fbClient && fbCaption) {
+          const videoUrl = `${config.nginxBaseUrl}/processed/${video.youtube_id}.mp4`;
+          this.fbClient.publishVideo(videoUrl, fbCaption).catch(err => {
+            logger.error(`Facebook cross-post failed (non-fatal): ${err.message}`);
+          });
+        }
+
+        // Step 6: Cleanup files
         await this.cleanup.cleanupVideo(video.id);
 
         logger.info(`Pipeline complete: ${video.youtube_id} → ${account.ig_username} (media=${result.mediaId})`);

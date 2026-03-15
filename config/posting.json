@@ -1,0 +1,31 @@
+{
+  "_comment": "Tweakable caption and posting settings. Edit this file and restart the bot.",
+
+  "groq": {
+    "enabled": true,
+    "model": "llama-3.1-8b-instant",
+    "fallbackToTemplates": true
+  },
+
+  "instagram": {
+    "captionPrefix": "",
+    "captionSuffix": "",
+    "maxHashtags": 15
+  },
+
+  "facebook": {
+    "enabled": false,
+    "captionPrefix": "",
+    "captionSuffix": "",
+    "maxHashtags": 5
+  },
+
+  "captionTone": {
+    "clips":       "energetic, fun, emoji-rich, Gen-Z slang, short punchy hooks",
+    "motivation":  "inspirational, uplifting, empowering, hustle culture",
+    "tech":        "informative, curious, forward-looking, innovation-focused",
+    "finance":     "value-focused, smart, practical, money-savvy",
+    "fitness":     "energetic, motivating, gym culture, body transformation",
+    "cooking":     "warm, appetizing, food-lover, home cook vibes"
+  }
+}

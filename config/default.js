@@ -42,6 +42,20 @@ module.exports = {
     maxRetriesPerPost: 3,
   },
 
+  // Groq AI caption generation (free at console.groq.com)
+  groq: {
+    apiKey: process.env.GROQ_API_KEY || null,
+    model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+  },
+
+  // Facebook Page cross-posting
+  facebook: {
+    enabled: process.env.FB_POST_ENABLED === 'true',
+    pageId: process.env.FB_PAGE_ID || null,
+    pageToken: process.env.FB_PAGE_ACCESS_TOKEN || null,
+    graphApiVersion: 'v21.0',
+  },
+
   // Instagram API
   instagram: {
     graphApiVersion: 'v21.0',
