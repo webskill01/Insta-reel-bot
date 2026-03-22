@@ -1,5 +1,5 @@
 {
-  "_comment": "Tweakable caption and posting settings. Edit this file and restart the bot.",
+  "_comment": "Main caption config. Changes take effect on the next post — no restart needed.",
 
   "groq": {
     "enabled": true,
@@ -10,6 +10,9 @@
   "instagram": {
     "captionPrefix": "",
     "captionSuffix": "",
+    "universalText": "#Japan is turning footsteps into electricity! Using piezoelectric tiles, every step you take generates a small amount of energy. Millions of steps together can power LED lights and displays in busy places like Shibuya Station. A brilliant way to create a sustainable and smart city turning m...",
+    "universalHashtags": ["#reels", "#trending", "#fyp","#viral","#explore",
+        "#foryou", "#foryoupage", "#viralvideos", "#entertainment"],
     "maxHashtags": 15
   },
 
@@ -17,15 +20,13 @@
     "enabled": false,
     "captionPrefix": "",
     "captionSuffix": "",
+    "universalText": "",
+    "universalHashtags": [],
     "maxHashtags": 5
   },
 
   "captionTone": {
-    "clips":       "energetic, fun, emoji-rich, Gen-Z slang, short punchy hooks",
-    "motivation":  "inspirational, uplifting, empowering, hustle culture",
-    "tech":        "informative, curious, forward-looking, innovation-focused",
-    "finance":     "value-focused, smart, practical, money-savvy",
-    "fitness":     "energetic, motivating, gym culture, body transformation",
-    "cooking":     "warm, appetizing, food-lover, home cook vibes"
+    "clips": "energetic, fun, emoji-rich, Gen-Z slang, short punchy hooks, variety content",
+    "anime": "hype, passionate, otaku culture, cinematic, anime fan energy, emotionally intense"
   }
 }

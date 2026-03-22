@@ -14,7 +14,12 @@
       "WebFetch(domain:docs.nginx.com)",
       "WebFetch(domain:www.rapidseedbox.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:www.ditig.com)"
+      "WebFetch(domain:www.ditig.com)",
+      "Bash(sqlite3 /c/Users/Dell/Desktop/Insta-reel-bot/data/reel-bot.db \"SELECT id, ig_username, niche, is_active, max_posts_day FROM accounts;\")",
+      "Bash(sqlite3 '/c/Users/Dell/Desktop/Insta-reel-bot/data/reel-bot.db' \".tables\")",
+      "Bash(ls -la \"c:\\\\Users\\\\Dell\\\\Desktop\\\\Insta-reel-bot\\\\src\\\\publisher\"\" 2>/dev/null || echo \"Directory not found \")",
+      "Bash(find /c/Users/Dell/Desktop/insta-bot/src -type f -name *.js)",
+      "Bash(find /c/Users/Dell/Desktop/Insta-bot/src -type f -name *.js)"
     ]
   }
 }

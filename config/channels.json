@@ -5,7 +5,16 @@
       "channels": [
         { "id": "UCqEfLGxwY2v4X44aDMmMocw", "name": "DualFeed Media" },
         { "id": "UCJQ46lK8_xj1DDXkNIs0sbg", "name": "DailyDiscover" },
+        { "id": "UCnoOX392v-ibhuBdYrF3S0A", "name": "Superverse Central" },
         { "id": "UCN_Isrggs_Qhdl4PF_M-y2g", "name": "Notable Net" }
+      ]
+    },
+    {
+      "niche": "anime",
+      "channels": [
+        { "id": "UC86VUeBHW6DVAbE0078_t6w", "name": "Vlakake" },
+        { "id": "UCEAJW5qwe8ZiJ7uCtd_eZZA", "name": "Indra Ootsutsuki" },
+        { "id": "UCW0dVAFR-LiH-jpdK48VG9g", "name": "@deman-s1" }
       ]
     }
   ]

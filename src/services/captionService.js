@@ -47,18 +47,37 @@ async function generateCaptions(video, account) {
     base = _templateFallback(video, account);
   }
 
-  // Apply prefix and suffix from posting.json
+  // Apply prefix, suffix, and universal content from posting.json
   const igSettings = posting.instagram || {};
   const fbSettings = posting.facebook || {};
 
   return {
-    instagram: _applyWrap(base.instagram, igSettings.captionPrefix, igSettings.captionSuffix),
-    facebook:  _applyWrap(base.facebook,  fbSettings.captionPrefix, fbSettings.captionSuffix),
+    instagram: _applyWrap(
+      base.instagram,
+      igSettings.captionPrefix,
+      igSettings.captionSuffix,
+      igSettings.universalText,
+      igSettings.universalHashtags
+    ),
+    facebook: _applyWrap(
+      base.facebook,
+      fbSettings.captionPrefix,
+      fbSettings.captionSuffix,
+      fbSettings.universalText,
+      fbSettings.universalHashtags
+    ),
   };
 }
 
-function _applyWrap(caption, prefix, suffix) {
-  const parts = [prefix, caption, suffix].filter(s => s && s.trim());
+function _applyWrap(caption, prefix, suffix, universalText, universalHashtags) {
+  const parts = [];
+  if (prefix && prefix.trim()) parts.push(prefix.trim());
+  parts.push(caption);
+  if (suffix && suffix.trim()) parts.push(suffix.trim());
+  if (universalText && universalText.trim()) parts.push(universalText.trim());
+  if (universalHashtags && universalHashtags.length > 0) {
+    parts.push(universalHashtags.join(' '));
+  }
   return parts.join('\n');
 }
 
@@ -70,24 +89,31 @@ async function _groqGenerate(video, posting) {
   const systemPrompt = `You generate short-form video captions for social media. Return valid JSON only, no markdown fences.
 Required schema: {"instagram": "...", "facebook": "..."}
 
+CRITICAL RULES — follow these strictly:
+- The video title is provided as CONTEXT ONLY to understand the topic and theme
+- Do NOT copy the YouTube title into the caption — write something completely original
+- Do NOT mention any creator names, channel names, YouTuber names, or any person's name from the title
+- Do NOT use phrases like "from [channel]", "by [creator]", or reference the video source
+- Write as if this is your own original content — purely about the topic itself
+
 Instagram rules:
-- Hook in first line (attention-grabbing, platform-native)
+- Open with a short punchy hook (1 line, under 80 chars) that captures the video's theme
 - Tone: ${tone}
-- Max 150 chars before hashtags
-- Add ${igMax} relevant hashtags on a new line starting with newlines
-- End with a CTA like "Follow for more 🔥" or "Save this 📌"
+- Body: 1-2 short lines expanding on the hook
+- Add ${igMax} relevant niche hashtags on a new line after the body
+- End with a CTA like "Follow for more" or "Save this"
 
 Facebook rules:
-- 2-3 sentences, friendly and conversational
+- 2-3 sentences, friendly and conversational, about the topic
 - Slightly less emoji than Instagram
-- Add ${fbMax} hashtags inline or at the end
-- End with "Like & follow for more videos!"
+- Add ${fbMax} hashtags at the end
+- End with "Like and follow for more videos!"
 
-Both captions are for a SHORT VIDEO (Reel/Short). Make them feel native to each platform.`;
+Both captions are for a SHORT VIDEO (Reel). Make them feel native to each platform.`;
 
-  const userPrompt = `Video title: "${video.title}"
+  const userPrompt = `Video title (use for topic/theme context only — do NOT copy or mention any names from it): "${video.title}"
 Niche: ${video.niche}
-Generate platform-specific captions for this short video.`;
+Generate original platform-specific captions about the theme of this video.`;
 
   const body = JSON.stringify({
     model: config.groq.model || 'llama-3.1-8b-instant',

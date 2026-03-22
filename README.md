@@ -1,30 +1,36 @@
 # Instagram Reel Bot
 
-An autonomous bot that downloads YouTube Shorts from curated channels and reposts them as Instagram Reels on multiple business accounts using the official Instagram Graph API.
+An autonomous bot that downloads YouTube Shorts from curated channels, generates AI captions, and reposts them as Instagram Reels (and optionally Facebook videos) on multiple business accounts using the official Meta Graph API.
 
 ## How It Works
 
 ```
-YouTube Shorts ──► Download ──► Transform ──► Upload ──► Instagram Reels
-   (yt-dlp)         (FFmpeg)      (Graph API)
+YouTube Shorts ──► Download ──► Transform ──► AI Caption ──► Instagram Reels
+   (yt-dlp)         (FFmpeg)      (Groq AI)     (Graph API)       + Facebook Page
 ```
 
 ### Pipeline Flow
 
-1. **Discovery** — The bot scans your configured YouTube channels every 4 hours using the YouTube Data API v3. It finds new Shorts (videos ≤ 60 seconds) and stores them in a local SQLite database.
+1. **Discovery** — The bot scans your configured YouTube channels every 4 hours using the YouTube Data API v3. It finds new Shorts (videos ≤ 60 seconds) and stores them in a local SQLite database. Channels are configured in `config/channels.json` and auto-linked to accounts by niche at startup.
 
-2. **Scheduling** — At midnight each day, the bot generates randomized posting times for each Instagram account across three time windows:
-   - Morning: 7:00 AM – 9:30 AM
-   - Afternoon: 12:00 PM – 2:30 PM
-   - Evening: 6:00 PM – 9:00 PM
+2. **Scheduling** — At 00:01 each day, the bot generates randomized posting times for each Instagram account across three time windows:
+   - Morning: 8:00 AM – 9:00 AM
+   - Afternoon: 2:00 PM – 3:00 PM
+   - Evening: 8:00 PM – 10:00 PM
+
+   The scheduler is self-healing: if the midnight cron misses (rare edge case), the 2-minute execution tick detects the new day and replans automatically within 2 minutes.
 
 3. **Download** — When a posting time arrives, the bot picks a random un-posted Short matching the account's niche and downloads it via `yt-dlp`.
 
 4. **Transform** — The video is processed through FFmpeg with slight modifications (crop, zoom, or watermark) to differentiate it from the original. Presets rotate automatically.
 
-5. **Upload** — The processed video is served via Nginx as a public URL, then uploaded to Instagram using the Graph API's two-step container flow (create container → poll until ready → publish).
+5. **AI Caption Generation** — Before uploading, the bot generates platform-aware captions using the Groq API (free tier). Instagram captions are emoji-rich with hooks and hashtags; Facebook captions are conversational with fewer hashtags. Falls back to `config/captions.json` templates if Groq is unavailable. Caption tone per niche is configurable in `config/posting.json`.
 
-6. **Cleanup** — Both raw and processed video files are deleted from disk immediately after a successful upload to save space.
+6. **Upload** — The processed video is served via Nginx (behind a Cloudflare Tunnel for HTTPS) as a public URL, then uploaded to Instagram using the Graph API's two-step container flow (create container → poll until ready → publish).
+
+7. **Facebook Cross-posting** — After a successful Instagram upload, the same video is optionally posted to a Facebook Page with its own caption. This is non-blocking — if Facebook fails, the Instagram post is already done.
+
+8. **Cleanup** — Both raw and processed video files are deleted from disk immediately after a successful upload.
 
 ### Multi-Account Support
 
@@ -32,15 +38,19 @@ Each Instagram account is configured with:
 - A **niche** (e.g., motivation, finance, tech) that determines which YouTube channels it pulls from
 - A **daily post limit** (default: 3 per day)
 - Its own **randomized schedule** — no two accounts post at the same time
+- An optional **linked Facebook Page** for cross-posting
 
 ### Reliability Features
 
+- **Self-healing scheduler** — detects missed midnight cron, replans within 2 minutes
+- **Daily failed video reset** — videos that failed the previous day are reset to retry automatically
 - **Retry with exponential backoff** on all API calls and downloads
 - **Rate limiter** — stays under Instagram's 200 requests/hour limit
 - **Token auto-refresh** — refreshes Instagram tokens 10 days before expiry
 - **Health monitor** — checks disk usage, stuck videos, DB health, and Nginx every 15 minutes
 - **Graceful shutdown** — waits for in-flight uploads to finish before stopping
 - **Duplicate prevention** — 4-layer system ensures the same video is never posted twice to the same account
+- **Deep content scanning** — fetches up to 5 pages per channel (250 videos), 5-month content window
 
 ---
 
@@ -55,11 +65,15 @@ You need the following on your VPS (Linux server):
 | **yt-dlp** | YouTube downloading |
 | **Nginx** | Serving video files as public URLs |
 | **PM2** | Process management |
+| **cloudflared** | Cloudflare Tunnel for HTTPS (required by Meta) |
 
 You also need:
 - A **YouTube Data API v3** key ([get one here](https://console.cloud.google.com/apis/credentials))
 - One or more **Instagram Business/Creator accounts** with Graph API access
-- **Long-lived access tokens** for each Instagram account ([Meta developer docs](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/get-started))
+- **Long-lived Instagram access tokens** for each account
+- A **Cloudflare Tunnel** with a domain pointing to your Nginx port (Meta's servers require HTTPS to fetch videos — plain HTTP will fail)
+- *(Optional)* A **Groq API key** (free at console.groq.com — no credit card needed) for AI captions
+- *(Optional)* A **Facebook Page** and Page access token for cross-posting
 
 ---
 
@@ -95,7 +109,64 @@ cd /opt/reel-bot
 npm install --production
 ```
 
-### Step 2: Configure Environment Variables
+### Step 2: Set Up Cloudflare Tunnel (Required)
+
+Meta's servers require HTTPS to fetch your videos. A plain `http://your-ip:8888` URL will always fail with a container error. You must use a Cloudflare Tunnel.
+
+```bash
+# Install cloudflared
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
+chmod +x /usr/local/bin/cloudflared
+
+# Authenticate (opens browser — run on a machine with browser, then copy cert)
+cloudflared tunnel login
+
+# Create a tunnel
+cloudflared tunnel create reel-bot
+
+# Create config (replace with your tunnel ID and domain)
+mkdir -p ~/.cloudflared
+cat > ~/.cloudflared/config.yml << EOF
+tunnel: YOUR-TUNNEL-ID
+credentials-file: /home/botuser/.cloudflared/YOUR-TUNNEL-ID.json
+ingress:
+  - hostname: cdn.yourdomain.com
+    service: http://localhost:8888
+  - service: http_status:404
+EOF
+
+# Add DNS record (routes cdn.yourdomain.com → tunnel)
+cloudflared tunnel route dns reel-bot cdn.yourdomain.com
+
+# Start tunnel with PM2
+pm2 start "cloudflared tunnel run reel-bot" --name cf-tunnel
+pm2 save
+```
+
+Then set `NGINX_BASE_URL=https://cdn.yourdomain.com` in your `.env`.
+
+### Step 3: Configure Nginx
+
+```bash
+# Copy the provided Nginx config
+sudo cp nginx/reel-bot.conf /etc/nginx/sites-available/reel-bot
+sudo ln -sf /etc/nginx/sites-available/reel-bot /etc/nginx/sites-enabled/
+
+# Update the alias path in the config if your data dir is different
+# Default expects: /opt/reel-bot/data/processed/
+sudo nano /etc/nginx/sites-available/reel-bot
+
+# Test and reload
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Verify Nginx is working:
+```bash
+curl http://localhost:8888/health
+# Should return: ok
+```
+
+### Step 4: Configure Environment Variables
 
 ```bash
 cp .env.example .env
@@ -122,8 +193,8 @@ IG_ACCOUNT_2_ACCESS_TOKEN=IGQVJ...your_token
 IG_ACCOUNT_2_NICHE=finance
 IG_ACCOUNT_2_MAX_POSTS_DAY=3
 
-# Your VPS public URL (used by Instagram to fetch videos)
-NGINX_BASE_URL=http://your-server-ip:8888
+# Your HTTPS CDN URL (Cloudflare Tunnel — Instagram fetches videos from this)
+NGINX_BASE_URL=https://cdn.yourdomain.com
 
 # Paths (defaults work for most setups)
 DATA_DIR=./data
@@ -132,56 +203,72 @@ DB_PATH=./data/reel-bot.db
 # Set to true to test without actually publishing to Instagram
 DRY_RUN=false
 LOG_LEVEL=info
+
+# Groq AI captions — free at console.groq.com (no credit card needed)
+# Leave blank to use captions.json templates instead
+GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxx
+GROQ_MODEL=llama-3.1-8b-instant
+
+# Facebook Page cross-posting (optional)
+FB_POST_ENABLED=false
+FB_PAGE_ID=
+FB_PAGE_ACCESS_TOKEN=
 ```
 
-### Step 3: Configure Nginx
+### Step 5: Configure YouTube Channels
 
-```bash
-# Copy the provided Nginx config
-sudo cp nginx/reel-bot.conf /etc/nginx/sites-available/reel-bot
-sudo ln -sf /etc/nginx/sites-available/reel-bot /etc/nginx/sites-enabled/
+Edit `config/channels.json` to add your channels grouped by niche. The bot auto-links channels to all accounts sharing that niche at startup — no script needed.
 
-# Update the alias path in the config if your data dir is different
-# Default expects: /opt/reel-bot/data/processed/
-sudo nano /etc/nginx/sites-available/reel-bot
-
-# Test and reload
-sudo nginx -t && sudo systemctl reload nginx
-
-# Open the port in firewall
-sudo ufw allow 8888/tcp
+```json
+{
+  "accounts": [
+    {
+      "niche": "motivation",
+      "channels": [
+        { "id": "UCxxxxxxxxxxxxxxxxxxxxxx", "name": "Motivation Channel" },
+        { "id": "UCyyyyyyyyyyyyyyyyyyyyyy", "name": "Success Mindset" }
+      ]
+    },
+    {
+      "niche": "finance",
+      "channels": [
+        { "id": "UCzzzzzzzzzzzzzzzzzzzzzz", "name": "Finance Tips" }
+      ]
+    }
+  ]
+}
 ```
 
-Verify Nginx is working:
-```bash
-curl http://localhost:8888/health
-# Should return: ok
+### Step 6: Configure Caption Settings
+
+Edit `config/posting.json` to tweak caption behavior. This file is read per-post — changes take effect immediately without restarting the bot.
+
+```json
+{
+  "groq": {
+    "enabled": true,
+    "model": "llama-3.1-8b-instant",
+    "fallbackToTemplates": true
+  },
+  "instagram": {
+    "captionPrefix": "",
+    "captionSuffix": "\n\nFollow @yourhandle for more! 🔥",
+    "maxHashtags": 15
+  },
+  "facebook": {
+    "enabled": false,
+    "captionPrefix": "",
+    "captionSuffix": "\n\nLike & follow for daily videos! 👍",
+    "maxHashtags": 5
+  },
+  "captionTone": {
+    "motivation": "inspirational, uplifting, empowering, hustle culture",
+    "finance": "value-focused, smart, practical, money-savvy"
+  }
+}
 ```
 
-### Step 4: Add YouTube Channels
-
-```bash
-# Add channels for each niche
-node scripts/seed-accounts.js add-channel \
-  --id UCxxxxxxxxxxxxxxxxxxxxxx \
-  --name "Motivation Channel" \
-  --niche motivation
-
-node scripts/seed-accounts.js add-channel \
-  --id UCyyyyyyyyyyyyyyyyyyyyyy \
-  --name "Finance Channel" \
-  --niche finance
-
-# Link channels to accounts (use IDs from list commands)
-node scripts/seed-accounts.js link-channel --account-id 1 --channel-id 1
-node scripts/seed-accounts.js link-channel --account-id 2 --channel-id 2
-
-# Verify setup
-node scripts/seed-accounts.js list-accounts
-node scripts/seed-accounts.js list-channels
-```
-
-### Step 5: Test with Dry Run
+### Step 7: Test with Dry Run
 
 ```bash
 # Set DRY_RUN=true in .env first, then:
@@ -190,11 +277,12 @@ node src/index.js
 
 Check the logs to verify:
 - Accounts are seeded from env vars
-- YouTube channels are scanned
+- YouTube channels are scanned and linked
 - Shorts are discovered
 - Schedule is generated
+- Captions are generated (Groq or template fallback)
 
-### Step 6: Go Live
+### Step 8: Go Live
 
 ```bash
 # Set DRY_RUN=false in .env, then start with PM2:
@@ -219,8 +307,8 @@ pm2 logs reel-bot
 # Check process status
 pm2 status
 
-# Restart the bot
-pm2 restart reel-bot
+# Restart the bot (required after .env changes)
+pm2 restart reel-bot --update-env
 
 # Stop the bot
 pm2 stop reel-bot
@@ -254,7 +342,10 @@ Place your watermark image at `data/watermarks/logo.png`. The bot will automatic
 insta-reel-bot/
 ├── config/
 │   ├── default.js              # All config (schedules, limits, API settings)
-│   └── transforms.js           # FFmpeg transform presets
+│   ├── transforms.js           # FFmpeg transform presets
+│   ├── channels.json           # YouTube channels by niche (auto-seeded at startup)
+│   ├── captions.json           # Caption templates (fallback when Groq not set)
+│   └── posting.json            # Tweakable caption/posting settings (live reload)
 ├── src/
 │   ├── index.js                # Entry point — boots everything
 │   ├── db/                     # SQLite database (better-sqlite3)
@@ -262,7 +353,12 @@ insta-reel-bot/
 │   ├── discovery/              # YouTube API scanning
 │   ├── downloader/             # yt-dlp wrapper
 │   ├── transformer/            # FFmpeg processing
-│   ├── publisher/              # Instagram Graph API
+│   ├── publisher/
+│   │   ├── igClient.js         # Instagram Graph API wrapper
+│   │   ├── publishService.js   # Instagram publish flow
+│   │   └── facebookClient.js   # Facebook Page video posting
+│   ├── services/
+│   │   └── captionService.js   # Groq AI captions + template fallback
 │   ├── pipeline/               # Orchestrates the full flow
 │   ├── cleanup/                # File deletion after upload
 │   ├── tokens/                 # Auto-refresh Instagram tokens
@@ -299,8 +395,8 @@ SQLite database at `data/reel-bot.db` with these tables:
 
 | Schedule | Job | Description |
 |----------|-----|-------------|
-| Midnight | Daily Planner | Generates randomized posting times |
-| Every 2 min | Execution Tick | Checks for due posts and triggers pipeline |
+| 00:01 daily | Daily Planner | Generates randomized posting times + resets failed videos |
+| Every 2 min | Execution Tick | Checks for due posts, self-heals if planner missed |
 | Every 4 hours | Discovery Scan | Scans YouTube channels for new Shorts |
 | 3:00 AM | Token Refresh | Refreshes tokens expiring within 10 days |
 | 4:00 AM | Orphan Cleanup | Deletes stale files older than 24 hours |
@@ -314,23 +410,45 @@ SQLite database at `data/reel-bot.db` with these tables:
 1. Check `pm2 logs reel-bot` for errors
 2. Verify `DRY_RUN=false` in `.env`
 3. Run `node scripts/seed-accounts.js list-accounts` — check `is_active` is 1
-4. Ensure YouTube channels are linked to accounts with matching niches
+4. Ensure YouTube channels are in `config/channels.json` with the correct niche
+
+### Container always returns ERROR?
+Meta's servers **must** be able to fetch videos via HTTPS. A plain `http://ip:port` URL will always fail.
+1. Confirm `NGINX_BASE_URL` starts with `https://`
+2. Verify your Cloudflare Tunnel is running: `pm2 status cf-tunnel`
+3. Test: `curl https://cdn.yourdomain.com/health` should return `ok`
 
 ### Instagram token expired?
 The bot auto-refreshes tokens 10 days before expiry. If a token expires, the account is deactivated. To fix:
 1. Get a new long-lived token from Meta
 2. Update `IG_ACCOUNT_N_ACCESS_TOKEN` in `.env`
-3. Restart: `pm2 restart reel-bot`
+3. Restart: `pm2 restart reel-bot --update-env`
 
-### Videos not uploading?
-1. Test Nginx: `curl http://your-ip:8888/health`
-2. Check a video URL is accessible: `curl -I http://your-ip:8888/processed/somefile.mp4`
-3. Ensure your VPS IP is publicly reachable on port 8888
+### No posts planned for today?
+If today shows 0 posting times in logs:
+- Check the account is active: `SELECT is_active FROM accounts WHERE ig_username='yourhandle';` in SQLite
+- If is_active=0, run: `UPDATE accounts SET is_active=1 WHERE ig_username='yourhandle';`
+- The self-healing tick will replan within 2 minutes
 
 ### Disk filling up?
 The bot deletes files after upload and runs cleanup at 4 AM. If disk still fills:
 - Check `logs/` directory size — old logs may accumulate
 - The health monitor triggers emergency cleanup at 90% disk usage automatically
+
+### Captions look wrong?
+- Edit `config/posting.json` — changes take effect on the next post (no restart needed)
+- To disable Groq and use templates: set `GROQ_API_KEY=` (empty) in `.env`
+- To change caption tone per niche: edit the `captionTone` object in `posting.json`
+
+---
+
+## Adding a New Niche / Account
+
+See [docs/ADD-NEW-NICHE.md](docs/ADD-NEW-NICHE.md) for a complete step-by-step guide covering:
+- Setting up Facebook Developer app permissions for new accounts
+- Getting Instagram long-lived tokens
+- Getting Facebook Page access tokens
+- Adding channels and configuring the bot
 
 ---
 
