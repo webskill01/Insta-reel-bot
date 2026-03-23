@@ -92,12 +92,14 @@ class PipelineCoordinator {
       if (result.success) {
         this._updateVideoStatus(video.id, 'published');
 
-        // Step 5b: Cross-post to Facebook (non-blocking, before file cleanup)
+        // Step 5b: Cross-post to Facebook — await before cleanup so file still exists on disk
         if (this.fbClient && fbCaption) {
           const videoUrl = `${config.nginxBaseUrl}/processed/${video.youtube_id}.mp4`;
-          this.fbClient.publishVideo(videoUrl, fbCaption).catch(err => {
+          try {
+            await this.fbClient.publishVideo(videoUrl, fbCaption);
+          } catch (err) {
             logger.error(`Facebook cross-post failed (non-fatal): ${err.message}`);
-          });
+          }
         }
 
         // Step 6: Cleanup files

@@ -19,9 +19,9 @@ module.exports = {
     },
 
     zoom: {
-      description: '5% zoom-in effect',
+      description: '5% zoom-in crop effect',
       videoFilters: [
-        'scale=iw*1.05:ih*1.05',
+        'scale=1134:2016:force_original_aspect_ratio=increase',
         'crop=1080:1920',
         'setsar=1',
       ],
