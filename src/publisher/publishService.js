@@ -27,7 +27,8 @@ class PublishService {
     const { caption, metadata } = prebuiltCaption
       ? { caption: prebuiltCaption, metadata: this._buildMetadata(video, account) }
       : this.generateCaption(video, account);
-    const videoUrl = `${config.nginxBaseUrl}/processed/${video.youtube_id}.mp4`;
+    const file = video.processed_path ? path.basename(video.processed_path) : `${video.youtube_id}.mp4`;
+    const videoUrl = `${config.nginxBaseUrl}/processed/${file}`;
 
     // Create or get post record
     let post = this.db.prepare(
@@ -54,7 +55,8 @@ class PublishService {
       // Step 1: Create container
       if (config.dryRun) {
         logger.info(`[DRY RUN] Would publish ${video.youtube_id} to ${account.ig_username}`);
-        this._updatePostStatus(post.id, 'published', { ig_media_id: 'dry_run' });
+        // Not 'published': the reel stays available for the real run
+        this._updatePostStatus(post.id, 'dry_run');
         return { success: true, mediaId: 'dry_run' };
       }
 

@@ -2,9 +2,14 @@ const logger = require('../utils/logger');
 const config = require('../../config/default');
 
 class DiscoveryService {
-  constructor(db, youtubeClient) {
+  constructor(db, youtubeClient, igClient) {
     this.db = db;
-    this.yt = youtubeClient;
+    this.yt = youtubeClient; // null when YOUTUBE_API_KEY is unset
+    this.ig = igClient;
+  }
+
+  _isIgSource(channel) {
+    return channel.channel_id.startsWith('ig:');
   }
 
   /**
@@ -21,7 +26,9 @@ class DiscoveryService {
 
     for (const channel of channels) {
       try {
-        const count = await this._scanChannel(channel);
+        const count = this._isIgSource(channel)
+          ? await this._scanIgSource(channel, config.instagramSource.pagesPerScan)
+          : await this._scanChannel(channel);
         discovered += count;
         scanned++;
 
@@ -37,8 +44,65 @@ class DiscoveryService {
       }
     }
 
-    logger.info(`Discovery scan complete: ${scanned} channels scanned, ${discovered} new Shorts found`);
+    logger.info(`Discovery scan complete: ${scanned} channels scanned, ${discovered} new videos found`);
     return { scanned, discovered };
+  }
+
+  /**
+   * Scans an Instagram source page (channel_id "ig:<username>") via Business Discovery.
+   * Upserts so a re-scan also refreshes expired media_url links. Stops early at stopAtId.
+   */
+  async _scanIgSource(channel, pages, stopAtId = null) {
+    const reader = this.db.prepare(
+      'SELECT ig_user_id, access_token FROM accounts WHERE is_active = 1 ORDER BY id LIMIT 1'
+    ).get();
+    if (!reader) throw new Error('No active account to read Instagram sources with');
+
+    const username = channel.channel_id.slice(3);
+    const exists = this.db.prepare('SELECT 1 FROM videos WHERE youtube_id = ?');
+    const upsert = this.db.prepare(`
+      INSERT INTO videos (youtube_id, channel_id, title, duration_sec, niche, status, source_url, permalink)
+      VALUES (?, ?, ?, 0, ?, 'discovered', ?, ?)
+      ON CONFLICT(youtube_id) DO UPDATE SET source_url = excluded.source_url
+    `);
+
+    let inserted = 0;
+    let withheld = 0;
+    let after = null;
+
+    for (let page = 0; page < pages; page++) {
+      const { items, next } = await this.ig.businessDiscovery(
+        reader.ig_user_id, reader.access_token, username, after, config.instagramSource.pageSize
+      );
+
+      for (const m of items) {
+        if (m.media_product_type !== 'REELS') continue;
+        // Meta withholds media_url for reels with copyrighted audio
+        if (!m.media_url) { withheld++; continue; }
+        if (!exists.get(m.id)) inserted++;
+        upsert.run(m.id, channel.channel_id, m.caption || '', channel.niche, m.media_url, m.permalink);
+      }
+
+      if (!next || (stopAtId && items.some(m => m.id === stopAtId))) break;
+      after = next;
+    }
+
+    if (inserted > 0 || withheld > 0) {
+      logger.info(`IG source @${username}: ${inserted} new reels${withheld ? `, ${withheld} skipped (no media_url)` : ''}`);
+    }
+    return inserted;
+  }
+
+  /**
+   * Instagram CDN links expire. Re-scans the source page until the reel is
+   * found again and returns its fresh link (or null if it's gone).
+   */
+  async refreshSourceUrl(video) {
+    const channel = this.db.prepare('SELECT * FROM channels WHERE channel_id = ?').get(video.channel_id);
+    if (!channel || !this._isIgSource(channel)) return null;
+    await this._scanIgSource(channel, config.instagramSource.deepScanPages, video.youtube_id);
+    const row = this.db.prepare('SELECT source_url FROM videos WHERE id = ?').get(video.id);
+    return row?.source_url && row.source_url !== video.source_url ? row.source_url : null;
   }
 
   /**
@@ -123,18 +187,18 @@ class DiscoveryService {
   }
 
   /**
-   * Picks a random undiscovered video for a given niche that hasn't been
-   * posted to the specified account.
+   * Picks a random video for a niche that this account hasn't posted yet.
+   * 'published' stays eligible so every account in the niche gets each video.
    */
   pickVideoForAccount(niche, accountId) {
     return this.db.prepare(`
       SELECT v.* FROM videos v
       WHERE v.niche = ?
-        AND v.status = 'discovered'
+        AND v.status IN ('discovered', 'published')
         AND v.locked_by IS NULL
         AND v.id NOT IN (
           SELECT video_id FROM posts
-          WHERE account_id = ? AND status != 'failed'
+          WHERE account_id = ? AND status NOT IN ('failed', 'dry_run')
         )
       ORDER BY RANDOM()
       LIMIT 1
@@ -156,6 +220,11 @@ class DiscoveryService {
 
     for (const channel of channels) {
       try {
+        if (this._isIgSource(channel)) {
+          totalNew += await this._scanIgSource(channel, config.instagramSource.deepScanPages);
+          continue;
+        }
+
         let playlistId = channel.uploads_playlist;
         if (!playlistId) {
           playlistId = await this.yt.getUploadsPlaylistId(channel.channel_id);

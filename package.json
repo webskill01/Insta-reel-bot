@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node src/index.js",
+    "test": "node --test",
     "seed": "node scripts/seed-accounts.js",
     "migrate": "node src/db/migrate.js"
   },

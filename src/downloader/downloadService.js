@@ -1,6 +1,8 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
+const https = require('https');
 const path = require('path');
+const { pipeline } = require('stream/promises');
 const logger = require('../utils/logger');
 const { withRetry } = require('../utils/retry');
 const config = require('../../config/default');
@@ -43,6 +45,33 @@ class DownloadService {
       baseDelay: 5000,
       label: `download(${youtubeId})`,
     });
+  }
+
+  /**
+   * Downloads a direct mp4 link (Instagram media_url). No retry: a failure is
+   * usually an expired link, which the coordinator refreshes.
+   */
+  async downloadUrl(url, id) {
+    const outputPath = path.resolve(this.outputDir, `${id}.mp4`);
+    if (this.validateFile(outputPath)) return outputPath;
+
+    const res = await new Promise((resolve, reject) => {
+      const req = https.get(url, resolve);
+      req.on('error', reject);
+      req.setTimeout(config.download.timeoutMs, () => req.destroy(new Error('download timeout')));
+    });
+    if (res.statusCode !== 200) {
+      res.resume();
+      throw new Error(`HTTP ${res.statusCode} downloading ${id}`);
+    }
+    await pipeline(res, fs.createWriteStream(outputPath));
+
+    if (!this.validateFile(outputPath)) {
+      fs.rmSync(outputPath, { force: true });
+      throw new Error(`Downloaded file failed validation: ${id}`);
+    }
+    logger.info(`Downloaded: ${id} → ${outputPath}`);
+    return outputPath;
   }
 
   /**

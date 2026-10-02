@@ -1,3 +1,4 @@
+const path = require('path');
 const logger = require('../utils/logger');
 const config = require('../../config/default');
 
@@ -64,13 +65,16 @@ class PipelineCoordinator {
 
       // Step 2: Download
       this._updateVideoStatus(video.id, 'downloading');
-      const rawPath = await this.downloader.download(video.youtube_id);
+      const rawPath = await this._download(video);
       this._updateVideoStatus(video.id, 'downloaded', { raw_path: rawPath });
 
-      // Step 3: Transform
+      // Step 3: Transform — one file per account, each with its own @handle watermark
       this._updateVideoStatus(video.id, 'transforming');
-      const processedPath = await this.transformer.transform(rawPath, video.youtube_id);
+      const processedPath = await this.transformer.transform(
+        rawPath, `${video.youtube_id}_${account.ig_username}`, { watermarkText: `@${account.ig_username}` }
+      );
       this._updateVideoStatus(video.id, 'transformed', { processed_path: processedPath });
+      video = { ...video, processed_path: processedPath };
 
       // Step 4: Generate captions
       let igCaption = null;
@@ -94,7 +98,7 @@ class PipelineCoordinator {
 
         // Step 5b: Cross-post to Facebook — await before cleanup so file still exists on disk
         if (this.fbClient && fbCaption) {
-          const videoUrl = `${config.nginxBaseUrl}/processed/${video.youtube_id}.mp4`;
+          const videoUrl = `${config.nginxBaseUrl}/processed/${path.basename(processedPath)}`;
           try {
             await this.fbClient.publishVideo(videoUrl, fbCaption);
           } catch (err) {
@@ -128,6 +132,22 @@ class PipelineCoordinator {
     } finally {
       if (video) this._releaseLock(video.id);
       this._inFlight.delete(account.id);
+    }
+  }
+
+  /**
+   * Instagram sources: direct link download, refreshing the link once if it expired.
+   * YouTube: yt-dlp.
+   */
+  async _download(video) {
+    if (!video.source_url) return this.downloader.download(video.youtube_id);
+    try {
+      return await this.downloader.downloadUrl(video.source_url, video.youtube_id);
+    } catch (err) {
+      logger.warn(`Download failed for ${video.youtube_id} (${err.message}), refreshing link...`);
+      const fresh = await this.discovery.refreshSourceUrl(video);
+      if (!fresh) throw err;
+      return this.downloader.downloadUrl(fresh, video.youtube_id);
     }
   }
 

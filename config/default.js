@@ -73,6 +73,18 @@ module.exports = {
     maxContentAgeDays: 150, // Reject Shorts older than 5 months
   },
 
+  // Instagram source pages (channels.json ids prefixed "ig:"), read via Business Discovery
+  instagramSource: {
+    pageSize: 50,
+    pagesPerScan: 2,   // regular 4-hourly scan: newest 100 posts
+    deepScanPages: 20, // when out of content / refreshing an expired media_url: up to 1000 posts
+  },
+
+  // Per-account "@handle" text watermark
+  watermark: {
+    fontFile: process.env.WATERMARK_FONT || '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+  },
+
   // Download
   download: {
     minFileSizeBytes: 100 * 1024,     // 100 KB

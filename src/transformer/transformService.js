@@ -19,7 +19,7 @@ class TransformService {
    * Applies FFmpeg transforms to a video.
    * @param {string} inputPath - path to raw video
    * @param {string} videoId - used for output filename
-   * @param {Object} options - { presetName, watermarkPath }
+   * @param {Object} options - { presetName, watermarkPath, watermarkText }
    * @returns {Promise<string>} path to processed video
    */
   async transform(inputPath, videoId, options = {}) {
@@ -66,7 +66,15 @@ class TransformService {
       args.push('-filter_complex', preset.filterComplex);
       args.push('-map', '[bg]', '-map', '0:a?');
     } else {
-      args.push('-vf', preset.videoFilters.join(','));
+      const filters = [...preset.videoFilters];
+      if (options.watermarkText) {
+        // ponytail: escapes ffmpeg's drawtext specials only; IG handles are just [a-z0-9._@]
+        const text = options.watermarkText.replace(/[\\:'%]/g, '\\$&');
+        filters.push(transformConfig.textWatermark
+          .replace('{font}', config.watermark.fontFile.replace(/:/g, '\\:'))
+          .replace('{text}', text));
+      }
+      args.push('-vf', filters.join(','));
     }
 
     args.push(

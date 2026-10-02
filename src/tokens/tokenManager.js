@@ -25,7 +25,12 @@ class TokenManager {
         logger.info(`Token for ${account.ig_username} expires in ${daysLeft} days, refreshing...`);
 
         try {
-          const result = await this.ig.refreshToken(account.access_token);
+          // Facebook-login tokens (EAA…) can't use ig_refresh_token; page tokens never expire,
+          // so confirm it still works and push the expiry out instead
+          const result = account.access_token.startsWith('EAA')
+            ? (await this.ig.checkToken(account.ig_user_id, account.access_token),
+              { access_token: account.access_token, expires_in: 60 * 86400 })
+            : await this.ig.refreshToken(account.access_token);
 
           const newExpires = Math.floor(Date.now() / 1000) + result.expires_in;
 

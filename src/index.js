@@ -39,11 +39,11 @@ async function main() {
     refillRate: config.instagram.rateLimitPerHour,
   });
 
-  const youtubeClient = new YouTubeClient(config.youtubeApiKey);
-  const discoveryService = new DiscoveryService(db, youtubeClient);
+  const youtubeClient = config.youtubeApiKey ? new YouTubeClient(config.youtubeApiKey) : null;
+  const igClient = new IGClient(rateLimiter);
+  const discoveryService = new DiscoveryService(db, youtubeClient, igClient);
   const downloadService = new DownloadService();
   const transformService = new TransformService();
-  const igClient = new IGClient(rateLimiter);
   const publishService = new PublishService(db, igClient);
   const cleanupService = new CleanupService(db);
   const tokenManager = new TokenManager(db, igClient);
@@ -111,11 +111,19 @@ function seedAccountsFromEnv(db) {
 
       logger.info(`Seeded account: ${username} (niche=${niche})`);
     } else {
-      // Update token if changed
+      // .env is the source of truth for username/niche/limit
       db.prepare(`
-        UPDATE accounts SET access_token = ?, updated_at = unixepoch()
+        UPDATE accounts SET ig_username = ?, niche = ?, max_posts_day = ?, updated_at = unixepoch()
+        WHERE ig_user_id = ?
+      `).run(username, niche, maxPosts, igUserId);
+
+      // A new token re-activates an account that was paused for an expired token
+      const now = Math.floor(Date.now() / 1000);
+      const changed = db.prepare(`
+        UPDATE accounts SET access_token = ?, is_active = 1, token_expires = ?, token_refreshed = ?
         WHERE ig_user_id = ? AND access_token != ?
-      `).run(token, igUserId, token);
+      `).run(token, now + 60 * 86400, now, igUserId, token);
+      if (changed.changes > 0) logger.info(`New token for ${username}: account (re)activated`);
     }
 
     i++;
@@ -123,7 +131,9 @@ function seedAccountsFromEnv(db) {
 }
 
 /**
- * Syncs YouTube channels from config/channels.json into the DB.
+ * Syncs sources from config/channels.json into the DB.
+ * Ids starting with "ig:" are Instagram pages, the rest YouTube channels.
+ * A group with "enabled": false is kept but switched off.
  * Channels are grouped by niche and auto-linked to all accounts sharing that niche.
  */
 function seedChannelsFromConfig(db) {
@@ -149,6 +159,7 @@ function seedChannelsFromConfig(db) {
     INSERT OR IGNORE INTO account_channels (account_id, channel_id)
     VALUES (?, ?)
   `);
+  const setActive = db.prepare('UPDATE channels SET is_active = ? WHERE channel_id = ?');
   const getChannelDbId = db.prepare('SELECT id FROM channels WHERE channel_id = ?');
   const getAccountsByNiche = db.prepare('SELECT id FROM accounts WHERE niche = ? AND is_active = 1');
 
@@ -163,6 +174,7 @@ function seedChannelsFromConfig(db) {
       for (const ch of group.channels || []) {
         const result = insertChannel.run(ch.id, ch.name, niche);
         if (result.changes > 0) channelsAdded++;
+        setActive.run(group.enabled === false ? 0 : 1, ch.id);
 
         const channelRow = getChannelDbId.get(ch.id);
         if (!channelRow) continue;

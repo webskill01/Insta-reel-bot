@@ -35,6 +35,25 @@ module.exports = {
       audioSampleRate: 48000,
     },
 
+    tint: {
+      description: '4% crop + slight brightness/contrast/saturation lift',
+      videoFilters: [
+        'crop=iw*0.96:ih*0.96',
+        'scale=1080:1920:force_original_aspect_ratio=decrease',
+        'pad=1080:1920:(ow-iw)/2:(oh-ih)/2',
+        'setsar=1',
+        'eq=brightness=0.02:contrast=1.04:saturation=1.08',
+      ],
+      useFilterComplex: false,
+      videoCodec: 'libx264',
+      preset: 'medium',
+      crf: 23,
+      videoBitrate: '4M',
+      audioCodec: 'aac',
+      audioBitrate: '128k',
+      audioSampleRate: 48000,
+    },
+
     watermark: {
       description: 'Bottom-right watermark overlay',
       videoFilters: [
@@ -56,5 +75,10 @@ module.exports = {
   },
 
   // Rotate through presets to add variation between uploads
-  presetRotation: ['default', 'zoom', 'default'],
+  presetRotation: ['default', 'zoom', 'tint'],
+
+  // Per-account "@handle" burned into every video. {font} and {text} are filled in by the transformer.
+  // y=h*0.70 keeps it clear of the Reels caption/buttons overlay at the bottom.
+  textWatermark: "drawtext=fontfile='{font}':text='{text}':fontsize=46:fontcolor=white@0.6" +
+    ':shadowcolor=black@0.6:shadowx=2:shadowy=2:x=(w-text_w)/2:y=h*0.70',
 };

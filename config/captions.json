@@ -15,6 +15,14 @@
         "#facts", "#didyouknow", "#interesting", "#knowledge", "#amazing", "#mindblowing"
       ]
     },
+    "memes": {
+      "captionTemplate": "{title}\n\n{hashtags}",
+      "hashtags": [
+        "#memes", "#funny", "#memesdaily", "#relatable", "#lol",
+        "#comedy", "#dankmemes", "#funnymemes", "#humor", "#reels",
+        "#viral", "#trending", "#fyp", "#explore", "#memepage"
+      ]
+    },
     "anime": {
       "captionTemplate": "{title}\n\n{hashtags}",
       "hashtags": [

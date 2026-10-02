@@ -90,9 +90,9 @@ async function _groqGenerate(video, posting) {
 Required schema: {"instagram": "...", "facebook": "..."}
 
 CRITICAL RULES — follow these strictly:
-- The video title is provided as CONTEXT ONLY to understand the topic and theme
-- Do NOT copy the YouTube title into the caption — write something completely original
-- Do NOT mention any creator names, channel names, YouTuber names, or any person's name from the title
+- The source title/caption is provided as CONTEXT ONLY to understand the topic and theme (it may be empty or just hashtags)
+- Do NOT copy the source title/caption — write something completely original
+- Do NOT mention any creator names, channel names, @handles, or any person's name from it
 - Do NOT use phrases like "from [channel]", "by [creator]", or reference the video source
 - Write as if this is your own original content — purely about the topic itself
 
@@ -111,7 +111,7 @@ Facebook rules:
 
 Both captions are for a SHORT VIDEO (Reel). Make them feel native to each platform.`;
 
-  const userPrompt = `Video title (use for topic/theme context only — do NOT copy or mention any names from it): "${video.title}"
+  const userPrompt = `Source title/caption (use for topic/theme context only — do NOT copy or mention any names from it): "${video.title || '(none)'}"
 Niche: ${video.niche}
 Generate original platform-specific captions about the theme of this video.`;
 

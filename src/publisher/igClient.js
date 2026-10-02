@@ -170,6 +170,29 @@ class IGClient {
   }
 
   /**
+   * Reads another Business/Creator account's posts.
+   * Needs instagram_manage_insights on the token.
+   */
+  async businessDiscovery(igUserId, accessToken, username, after = null, limit = 50) {
+    const media = `media${after ? `.after(${after})` : ''}.limit(${limit})` +
+      '{id,media_product_type,media_type,media_url,permalink,caption,timestamp}';
+    const result = await this._request('GET', igUserId, {
+      fields: `business_discovery.username(${username}){${media}}`,
+      access_token: accessToken,
+    });
+    const m = result.business_discovery?.media || {};
+    const items = m.data || [];
+    return { items, next: items.length === limit ? m.paging?.cursors?.after || null : null };
+  }
+
+  /**
+   * Throws if the token no longer works.
+   */
+  async checkToken(igUserId, accessToken) {
+    await this._request('GET', igUserId, { fields: 'id', access_token: accessToken });
+  }
+
+  /**
    * Refreshes a long-lived access token.
    * GET /refresh_access_token
    */
