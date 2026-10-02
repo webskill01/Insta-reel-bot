@@ -46,7 +46,7 @@ module.exports = {
   // Groq AI caption generation (free at console.groq.com)
   groq: {
     apiKey: process.env.GROQ_API_KEY || null,
-    model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+    model: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
   },
 
   // Facebook Page cross-posting

@@ -116,12 +116,14 @@ Niche: ${video.niche}
 Generate original platform-specific captions about the theme of this video.`;
 
   const body = JSON.stringify({
-    model: config.groq.model || 'llama-3.1-8b-instant',
+    model: config.groq.model,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
-    max_tokens: 500,
+    max_tokens: 1500,
+    // gpt-oss reasons before answering; low effort keeps the budget for the JSON
+    ...(/gpt-oss/.test(config.groq.model) && { reasoning_effort: 'low' }),
     temperature: 0.85,
     response_format: { type: 'json_object' },
   });
@@ -174,7 +176,8 @@ function _templateFallback(video, account) {
   const defaults = captionConfig.defaults || {};
   const nicheConfig = captionConfig.niches?.[account?.niche || video.niche] || {};
 
-  const title = video.title.replace(/#\w+/g, '').replace(/\s+/g, ' ').trim();
+  // Instagram sources: never reuse the source caption, hashtags only
+  const title = video.source_url ? '' : video.title.replace(/#\w+/g, '').replace(/\s+/g, ' ').trim();
 
   const nicheHashtags = nicheConfig.hashtags || [`#${video.niche}`];
   const appendHashtags = defaults.appendHashtags || [];
@@ -184,7 +187,7 @@ function _templateFallback(video, account) {
   const hashtagString = selected.join(' ');
 
   const template = nicheConfig.captionTemplate || defaults.captionTemplate || '{title}\n\n{hashtags}';
-  const caption = template.replace('{title}', title).replace('{hashtags}', hashtagString);
+  const caption = template.replace('{title}', title).replace('{hashtags}', hashtagString).trim();
 
   // Facebook gets fewer hashtags
   const fbSelected = [...allHashtags].sort(() => Math.random() - 0.5).slice(0, 5);
