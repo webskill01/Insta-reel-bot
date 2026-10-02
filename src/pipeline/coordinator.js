@@ -1,6 +1,7 @@
 const path = require('path');
 const logger = require('../utils/logger');
 const config = require('../../config/default');
+const { localDate } = require('../scheduler/timeWindows');
 
 class PipelineCoordinator {
   constructor(db, discoveryService, downloadService, transformService, publishService, cleanupService, captionService = null, facebookClient = null) {
@@ -152,7 +153,7 @@ class PipelineCoordinator {
   }
 
   _canPostToday(account) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDate();
     const stats = this.db.prepare(
       'SELECT posts_count FROM daily_stats WHERE account_id = ? AND date = ?'
     ).get(account.id, today);

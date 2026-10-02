@@ -55,3 +55,13 @@ function generateDailyTimes(postsPerDay) {
 }
 
 module.exports = { generateDailyTimes, randomTimeInWindow };
+
+/**
+ * Today's date (YYYY-MM-DD) in the server's local timezone (TZ), matching the
+ * posting windows and the 00:01 planner. UTC dates rolled over mid-schedule.
+ */
+function localDate() {
+  return new Date().toLocaleDateString('en-CA');
+}
+
+module.exports.localDate = localDate;

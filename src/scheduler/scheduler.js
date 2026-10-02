@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const logger = require('../utils/logger');
 const config = require('../../config/default');
-const { generateDailyTimes } = require('./timeWindows');
+const { generateDailyTimes, localDate } = require('./timeWindows');
 
 class Scheduler {
   constructor(db, pipelineCoordinator, discoveryService, tokenManager, cleanupService, healthMonitor) {
@@ -74,7 +74,7 @@ class Scheduler {
    * Plans posting times for all active accounts for today.
    */
   planDay() {
-    this._lastPlanDate = new Date().toISOString().split('T')[0];
+    this._lastPlanDate = localDate();
 
     // Reset videos that failed due to transient errors so they can be retried today
     const reset = this.db.prepare(
@@ -112,7 +112,7 @@ class Scheduler {
    */
   async executePendingPosts() {
     // Self-healing: replan if midnight cron was missed (node-cron reliability issue)
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDate();
     if (this._lastPlanDate !== today) {
       logger.info(`New day detected in execution tick, replanning for ${today}...`);
       this.planDay();

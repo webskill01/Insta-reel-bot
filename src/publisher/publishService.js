@@ -3,6 +3,7 @@ const fs = require('fs');
 const logger = require('../utils/logger');
 const { withRetry } = require('../utils/retry');
 const config = require('../../config/default');
+const { localDate } = require('../scheduler/timeWindows');
 
 // Load caption templates (cached at module level)
 let captionConfig = null;
@@ -195,7 +196,7 @@ class PublishService {
   }
 
   _incrementDailyStats(accountId) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDate();
     this.db.prepare(`
       INSERT INTO daily_stats (account_id, date, posts_count)
       VALUES (?, ?, 1)
@@ -204,7 +205,7 @@ class PublishService {
   }
 
   _incrementDailyFailures(accountId) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDate();
     this.db.prepare(`
       INSERT INTO daily_stats (account_id, date, failures)
       VALUES (?, ?, 1)

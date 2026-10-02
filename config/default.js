@@ -18,11 +18,12 @@ module.exports = {
   // Server
   nginxBaseUrl: process.env.NGINX_BASE_URL || 'http://localhost:8888',
 
-  // Scheduling - time windows for randomized posting (HH:MM in server timezone)
+  // Scheduling - time windows for randomized posting (HH:MM in the TZ env timezone).
+  // Tuned for tier-1 audiences with TZ=America/New_York:
   postingWindows: {
-    morning:   { start: '08:00', end: '09:00' },
-    afternoon: { start: '14:00', end: '15:00' },
-    evening:   { start: '20:00', end: '22:00' },
+    morning:   { start: '08:00', end: '09:30' }, // US East commute + UK/EU early afternoon
+    afternoon: { start: '12:00', end: '13:30' }, // US lunch + UK/EU evening
+    evening:   { start: '19:00', end: '21:30' }, // US East prime time + US West late afternoon
   },
 
   // Cron schedules
