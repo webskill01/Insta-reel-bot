@@ -100,7 +100,7 @@ Instagram rules:
 - Open with a short punchy hook (1 line, under 80 chars) that captures the video's theme
 - Tone: ${tone}
 - Body: 1-2 short lines expanding on the hook
-- Add ${igMax} relevant niche hashtags on a new line after the body
+- Add ${igMax} hashtags on a new line after the body, all about the "${video.niche}" niche (e.g. for memes: #memes #funny #relatable), NOT about the video's specific topic
 - End with a CTA like "Follow for more" or "Save this"
 
 Facebook rules:

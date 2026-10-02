@@ -11,8 +11,7 @@
     "captionPrefix": "",
     "captionSuffix": "",
     "universalText": "",
-    "universalHashtags": ["#reels", "#trending", "#fyp","#viral","#explore",
-        "#foryou", "#foryoupage", "#viralvideos", "#entertainment"],
+    "universalHashtags": [],
     "maxHashtags": 15
   },
 

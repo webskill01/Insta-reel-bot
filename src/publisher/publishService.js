@@ -28,6 +28,14 @@ class PublishService {
     const { caption, metadata } = prebuiltCaption
       ? { caption: prebuiltCaption, metadata: this._buildMetadata(video, account) }
       : this.generateCaption(video, account);
+
+    // Per-account reel cover: data/covers/<username>.jpg, served by nginx at /covers/
+    const cover = path.join(config.dataDir, 'covers', `${account.ig_username}.jpg`);
+    if (fs.existsSync(cover)) {
+      // ?v= busts the CDN cache when the image is replaced
+      metadata.cover_url = `${config.nginxBaseUrl}/covers/${account.ig_username}.jpg?v=${Math.floor(fs.statSync(cover).mtimeMs)}`;
+    }
+
     const file = video.processed_path ? path.basename(video.processed_path) : `${video.youtube_id}.mp4`;
     const videoUrl = `${config.nginxBaseUrl}/processed/${file}`;
 
