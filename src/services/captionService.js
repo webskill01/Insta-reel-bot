@@ -31,8 +31,23 @@ async function generateCaptions(video, account) {
   const posting = loadPostingConfig();
   const groqEnabled = posting.groq?.enabled !== false;
 
+  // Per-account fixed caption: fixed text + Groq search keywords + niche hashtags
+  const fixed = posting.fixedCaptions?.[account?.ig_username];
+
   let base;
-  if (config.groq.apiKey && groqEnabled) {
+  if (fixed) {
+    const t = _templateFallback({ ...video, title: '' }, account);
+    let kw = '';
+    if (config.groq.apiKey && groqEnabled) {
+      try {
+        kw = await _groqKeywords(video);
+      } catch (err) {
+        logger.warn(`Groq keywords failed, posting without them: ${err.message}`);
+      }
+    }
+    const head = kw ? `${fixed}\n\n${kw}` : fixed;
+    base = { instagram: `${head}\n\n${t.instagram}`, facebook: `${head}\n\n${t.facebook}` };
+  } else if (config.groq.apiKey && groqEnabled) {
     try {
       base = await _groqGenerate(video, posting);
       logger.debug(`Generated Groq caption for: ${video.title.slice(0, 50)}`);
@@ -52,13 +67,13 @@ async function generateCaptions(video, account) {
   const fbSettings = posting.facebook || {};
 
   return {
-    instagram: _applyWrap(
+    instagram: capHashtags(_applyWrap(
       base.instagram,
       igSettings.captionPrefix,
       igSettings.captionSuffix,
       igSettings.universalText,
       igSettings.universalHashtags
-    ),
+    ), igSettings.maxHashtags || 5),
     facebook: _applyWrap(
       base.facebook,
       fbSettings.captionPrefix,
@@ -67,6 +82,13 @@ async function generateCaptions(video, account) {
       fbSettings.universalHashtags
     ),
   };
+}
+
+// Instagram caps posts at 5 hashtags (Dec 2025); drop any beyond the limit
+function capHashtags(caption, max) {
+  let n = 0;
+  return caption.replace(/#[\p{L}\p{N}_]+/gu, tag => (++n <= max ? tag : ''))
+    .replace(/[ \t]+/g, ' ').replace(/ +\n/g, '\n').trim();
 }
 
 function _applyWrap(caption, prefix, suffix, universalText, universalHashtags) {
@@ -97,11 +119,12 @@ CRITICAL RULES — follow these strictly:
 - Write as if this is your own original content — purely about the topic itself
 
 Instagram rules:
-- Open with a short punchy hook (1 line, under 80 chars) that captures the video's theme
+- Open with a short punchy hook (1 line, under 80 chars) that captures the video's theme; work in 1-2 plain search keywords (e.g. "funny meme", "relatable") since Instagram search reads caption text
 - Tone: ${tone}
 - Body: 1-2 short lines expanding on the hook
-- Add ${igMax} hashtags on a new line after the body, all about the "${video.niche}" niche (e.g. for memes: #memes #funny #relatable), NOT about the video's specific topic
-- End with a CTA like "Follow for more" or "Save this"
+- Add EXACTLY ${igMax} hashtags (Instagram rejects more) on a new line after the body: 2 broad + the rest specific, all about the "${video.niche}" niche (e.g. for memes: #memes #funny #relatablememes), NOT about the video's specific topic
+- Never use #reels #viral #fyp #explore #trending — Instagram says they hurt reach
+- End with a CTA that drives shares/saves, like "Send this to that one friend 😭" or "Follow for more"
 
 Facebook rules:
 - 2-3 sentences, friendly and conversational, about the topic
@@ -115,6 +138,28 @@ Both captions are for a SHORT VIDEO (Reel). Make them feel native to each platfo
 Niche: ${video.niche}
 Generate original platform-specific captions about the theme of this video.`;
 
+  const content = await _groqChat(systemPrompt, userPrompt, 0.85);
+  if (!content.instagram || !content.facebook) {
+    throw new Error('Groq response missing instagram/facebook fields');
+  }
+  return { instagram: content.instagram, facebook: content.facebook };
+}
+
+// Search keywords only (no hashtags) — Instagram search reads caption text
+async function _groqKeywords(video) {
+  const systemPrompt = `You write Instagram search keywords for a short video. Return valid JSON only: {"keywords": ["...", "..."]}
+- 4 to 6 short lowercase search phrases (1-3 words each) people would type into Instagram search to find this video
+- Mix the video's topic/theme with the "${video.niche}" niche (e.g. "funny memes", "relatable video")
+- No hashtags, no emojis, no person, creator or channel names`;
+  const userPrompt = `Source title/caption (context only): "${video.title || '(none)'}"\nNiche: ${video.niche}`;
+  const content = await _groqChat(systemPrompt, userPrompt, 0.5);
+  if (!Array.isArray(content.keywords) || !content.keywords.length) {
+    throw new Error('Groq response missing keywords');
+  }
+  return content.keywords.map(k => String(k).replace(/#/g, '').trim()).filter(Boolean).join(', ');
+}
+
+function _groqChat(systemPrompt, userPrompt, temperature) {
   const body = JSON.stringify({
     model: config.groq.model,
     messages: [
@@ -124,7 +169,7 @@ Generate original platform-specific captions about the theme of this video.`;
     max_tokens: 1500,
     // gpt-oss reasons before answering; low effort keeps the budget for the JSON
     ...(/gpt-oss/.test(config.groq.model) && { reasoning_effort: 'low' }),
-    temperature: 0.85,
+    temperature,
     response_format: { type: 'json_object' },
   });
 
@@ -145,11 +190,7 @@ Generate original platform-specific captions about the theme of this video.`;
         try {
           const parsed = JSON.parse(data);
           if (parsed.error) return reject(new Error(parsed.error.message));
-          const content = JSON.parse(parsed.choices[0].message.content);
-          if (!content.instagram || !content.facebook) {
-            return reject(new Error('Groq response missing instagram/facebook fields'));
-          }
-          resolve({ instagram: content.instagram, facebook: content.facebook });
+          resolve(JSON.parse(parsed.choices[0].message.content));
         } catch (e) {
           reject(new Error(`Groq parse error: ${e.message} | raw: ${data.slice(0, 200)}`));
         }
@@ -197,4 +238,4 @@ function _templateFallback(video, account) {
   return { instagram: caption, facebook: fbCaption };
 }
 
-module.exports = { generateCaptions };
+module.exports = { generateCaptions, capHashtags };

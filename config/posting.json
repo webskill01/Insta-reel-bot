@@ -7,12 +7,17 @@
     "fallbackToTemplates": true
   },
 
+  "_fixedCaptions": "Per-account caption by IG username: this text + Groq search keywords + niche hashtags",
+  "fixedCaptions": {
+    "bisht.files": "的现场表演以独特时尚造型而闻名的他这次依旧 保持一贯的高级感以一身宛如T台造型般的时尚穿搭展现出 effortless的魅力"
+  },
+
   "instagram": {
     "captionPrefix": "",
     "captionSuffix": "",
     "universalText": "",
     "universalHashtags": [],
-    "maxHashtags": 15
+    "maxHashtags": 5
   },
 
   "facebook": {

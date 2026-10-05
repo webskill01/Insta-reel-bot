@@ -2,7 +2,7 @@
   "_comment": "Fallback captions used only when Groq API is unavailable. Universal hashtags are in posting.json.",
 
   "defaults": {
-    "hashtagCount": 15,
+    "hashtagCount": 5,
     "captionTemplate": "{title}\n\n{hashtags}"
   },
 
@@ -19,8 +19,8 @@
       "captionTemplate": "{title}\n\n{hashtags}",
       "hashtags": [
         "#memes", "#funny", "#memesdaily", "#relatable", "#lol",
-        "#comedy", "#dankmemes", "#funnymemes", "#humor", "#reels",
-        "#viral", "#trending", "#fyp", "#explore", "#memepage"
+        "#comedy", "#dankmemes", "#funnymemes", "#humor",
+        "#memepage", "#memesfunny", "#relatablememes"
       ]
     },
     "anime": {
